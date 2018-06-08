@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27703.2026
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OscarBot", "OscarBot\OscarBot.csproj", "{3158A6C6-3325-4FD2-8A43-57CD60E6C274}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3158A6C6-3325-4FD2-8A43-57CD60E6C274}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3158A6C6-3325-4FD2-8A43-57CD60E6C274}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3158A6C6-3325-4FD2-8A43-57CD60E6C274}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3158A6C6-3325-4FD2-8A43-57CD60E6C274}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {826F40DF-76AA-4A64-AD02-8F650E9B6274}
+	EndGlobalSection
+EndGlobal
