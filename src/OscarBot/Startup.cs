@@ -74,6 +74,7 @@ namespace Oscar.Bot
 				TraktService.Instance.ClientID = Configuration.GetSection("TraktClientId")?.Value;
 				TraktService.Instance.ClientSecret = Configuration.GetSection("TraktClientSecret")?.Value;
 				TraktService.Instance.AccessToken = Configuration.GetSection("TraktAccessToken")?.Value;
+				TmdbService.Instance.ApiKey = Configuration.GetSection("TmdbApiKey")?.Value;
 			});
 		}
 

@@ -31,7 +31,7 @@ namespace Oscar.Bot
 			_client = null;
 		}
 
-		async Task<T> GetContent<T>(string path, bool cache = true, bool firstAttempt = true, Dictionary<string, object> keys = null)
+		async Task<T> GetContent<T>(string path)
 		{
 			if(_client == null)
 			{
@@ -39,12 +39,6 @@ namespace Oscar.Bot
 				_client.DefaultRequestHeaders.TryAddWithoutValidation("trakt-api-version", "2");
 				_client.DefaultRequestHeaders.TryAddWithoutValidation("trakt-api-key", ClientID);
 				_client.DefaultRequestHeaders.TryAddWithoutValidation("authorization", $"Bearer {AccessToken}");
-
-				if(keys != null)
-				{
-					foreach(var kvp in keys)
-						_client.DefaultRequestHeaders.TryAddWithoutValidation(kvp.Key, kvp.Value.ToString());
-				}
 			}
 
 			if(!path.Contains("?"))

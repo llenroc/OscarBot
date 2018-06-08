@@ -15,24 +15,25 @@ namespace Oscar.Bot
 
 		public string ApiKey { get; set; }
 
-		static TmdbService
- _instance;
+		readonly string _baseApiUrl = "https://api.themoviedb.org/3";
+		readonly string _baseImageUrl = "http://image.tmdb.org/t/p";
+		readonly string _backdropImageSize = "1280";
+		static TmdbService _instance;
 
-		public static TmdbService
- Instance { get => _instance ?? (_instance = new TmdbService
-()); }
+		public static TmdbService Instance { get => _instance ?? (_instance = new TmdbService()); }
+
 
 		public void Reset()
 		{
 			_client = null;
 		}
 
-		async Task<T> GetContent<T>(string path, bool cache = true, bool firstAttempt = true, Dictionary<string, object> keys = null)
+		async Task<T> GetContent<T>(string path)
 		{
 			if(_client == null)
 				_client = new HttpClient();
 
-			var url = $"https://api.trakt.tv{path}";// + "&t=" + DateTime.Now.Ticks.ToString();
+			var url = $"{_baseApiUrl}{path}";
 			Debug.WriteLine($"Requesting JSON from {url}");
 
 			try
@@ -65,241 +66,11 @@ namespace Oscar.Bot
 			}
 		}
 
-		async public Task<(Show, Episode)> GetNextEpisode(string showTitle)
+		async public Task<string> GetShowImageUrlLandscape(string tmdbShowId)
 		{
-			var show = await GetShow(showTitle);
-			var episode = await GetContent<Episode>($"/shows/{show.Ids.Trakt}/next_episode?extended=full,images");
-			return (show, episode);
+			var imageSet = await GetContent<TmdbImageSet>($"/tv/{tmdbShowId}/images?api_key={ApiKey}");
+			var url = $"{_baseImageUrl}/w{_backdropImageSize}{imageSet.Backdrops.First().FilePath}";
+			return url;
 		}
-
-		async public Task<(Show, Episode)> GetLastEpisode(string showTitle)
-		{
-			var show = await GetShow(showTitle);
-			var episode = await GetContent<Episode>($"/shows/{show.Ids.Trakt}/last_episode?extended=full,images");
-			return (show, episode);
-
-		}
-
-		async Task<Show> GetShow(string showTitle)
-		{
-			var results = await GetContent<List<SearchResult>>($"/search/show?query={showTitle}&extended=full");
-
-			if(results.Count == 0)
-				return null;
-
-			return results.First().Show;
-		}
-
-
-		/*
-		public Task<OAuthToken> GetTokenForCode(string code)
-		{
-			return new Task<OAuthToken>(() =>
-			{
-				//var handler = new NativeMessageHandler() {
-				//	DisableCaching = true,
-				//	Proxy = CoreFoundation.CFNetwork.GetDefaultProxy(),
-				//	UseProxy = true,
-				//};
-
-				using(var client = new HttpClient())
-				{
-					client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-					var authCode = new OAuthCode
-					{
-						Code = code,
-						ClientId = _traktClientID,
-						ClientSecret = _traktClientSecret,
-						RedirectUri = TraktService.Instance.RedirectUrl,
-					};
-					var codeJson = JsonConvert.SerializeObject(authCode);
-					var content = new StringContent(codeJson, Encoding.UTF8, "application/json");
-					var response = client.PostAsync("https://api-v2launch.trakt.tv/oauth/token", content).Result;
-					var body = response.Content.ReadAsStringAsync().Result;
-
-					var token = JsonConvert.DeserializeObject<OAuthToken>(body);
-					return token;
-				}
-			});
-		}
-
-
-		public void ClearHistory(string keyFilter = null)
-		{
-			if(keyFilter != null)
-			{
-				_history.Keys.Where(k => k.ContainsNoCase(keyFilter)).ToList().ForEach(k => _history.Remove(k));
-			}
-			else
-			{
-				_history.Clear();
-			}
-		}
-
-		public Task<Show> GetShow(int traktId)
-		{
-			return new Task<Show>(() => {
-				var show = GetContent<Show>($"shows/{traktId}?extended=full,images").Result;
-				return show;
-			});
-		}
-
-		public Task<List<SearchResult>> SearchShows(string query)
-		{
-			return new Task<List<SearchResult>>(() =>
-			{
-				var keys = new Dictionary<string, object>();
-				keys.Add("X-Pagination-Page:", 1);
-				keys.Add("X-Pagination-Limit", 100);
-				var list = GetContent<List<SearchResult>>("search?query={0}&type=show".Fmt(query), false, true, keys).Result;
-				return list.OrderByDescending(r => r.Score).ToList();
-			});
-		}
-
-		public Task<List<Season>> GetSeasonsForShow(Show show)
-		{
-			return new Task<List<Season>>(() =>
-			{
-				var list = GetContent<List<Season>>("shows/{0}/seasons?extended=full,images".Fmt(show.Identifiers.Trakt)).Result;
-
-				if(list == null)
-					return null;
-
-				list = list.OrderBy(s => s.Number).ToList();
-				return list;
-			});
-		}
-
-		public Task<List<Episode>> GetEpisodesForSeason(Show show, Season season)
-		{
-			return new Task<List<Episode>>(() =>
-			{
-				var list = GetContent<List<Episode>>("shows/{0}/seasons/{1}?extended=full,images".Fmt(show.Identifiers.Trakt, season.Number)).Result;
-
-				if(list == null)
-					return null;
-
-				list = list.OrderBy(e => e.InitialBroadcastDate).ToList();
-				return list;
-			});
-		}
-
-		public Task<ShowCast> GetCastAndCrew(Show show)
-		{
-			return new Task<ShowCast>(() => {
-				var cast = GetContent<ShowCast>($"shows/{show.Identifiers.Trakt}/people?extended=images").Result;
-				return cast;
-			});
-		}
-
-		public Task<List<Show>> GetUpdatedShowsSince(DateTime time)
-		{
-			return new Task<List<Show>>(() =>
-			{
-				var list = GetContent<List<ShowUpdate>>("shows/updates/{0}/?limit=1000000".Fmt(time.ToString("O"))).Result;
-
-				if(list == null)
-					return null;
-
-				var shows = list.OrderBy(s => s.Show.SortTitle).Select(s => s.Show).ToList();
-
-				Debug.WriteLine("Count: " + list.Count);
-				return shows;
-			});
-		}
-
-		public Task<UserProfile> GetUserProfile()
-		{
-			return new Task<UserProfile>(() => {
-				var profile = GetContent<UserProfile>("users/me").Result;
-				return profile;
-			});
-		}
-
-		public Task<List<ShowRating>> GetFavoriteShows()
-		{
-			return new Task<List<ShowRating>>(() => {
-				var list = GetContent<List<ShowRating>>("sync/watchlist/shows?extended=full,images".Fmt(Settings.Instance.TraktUsername)).Result;
-				return list;
-			});
-		}
-
-		public Task AddShowToFavorites(Show show)
-		{
-			return new Task(() => {
-				var client = new HttpClient();
-				client.DefaultRequestHeaders.TryAddWithoutValidation("trakt-api-version", "2");
-				client.DefaultRequestHeaders.TryAddWithoutValidation("trakt-api-key", _traktClientID);
-				client.DefaultRequestHeaders.TryAddWithoutValidation("authorization", "Bearer {0}".Fmt(Settings.Instance.AuthToken));
-
-				var favorite = new FavoriteShow
-				{
-					Ids = new Ids { Trakt = show.Identifiers.Trakt }
-				};
-
-				var root = new FavoriteList();
-				root.Shows.Add(favorite);
-
-				var codeJson = JsonConvert.SerializeObject(root);
-				var content = new StringContent(codeJson, Encoding.UTF8, "application/json");
-				var response = client.PostAsync($"https://api-v2launch.trakt.tv/sync/watchlist", content).Result;
-				var body = response.Content.ReadAsStringAsync().Result;
-
-				Console.WriteLine(body);
-			});
-		}
-
-		public Task RemoveShowFromFavorites(Show show)
-		{
-			return new Task(() => {
-				var client = new HttpClient();
-				client.DefaultRequestHeaders.TryAddWithoutValidation("trakt-api-version", "2");
-				client.DefaultRequestHeaders.TryAddWithoutValidation("trakt-api-key", _traktClientID);
-				client.DefaultRequestHeaders.TryAddWithoutValidation("authorization", "Bearer {0}".Fmt(Settings.Instance.AuthToken));
-
-				var favorite = new FavoriteShow
-				{
-					Ids = new Ids { Trakt = show.Identifiers.Trakt }
-				};
-
-				var root = new FavoriteList();
-				root.Shows.Add(favorite);
-
-				var codeJson = JsonConvert.SerializeObject(root);
-				var content = new StringContent(codeJson, Encoding.UTF8, "application/json");
-				var response = client.PostAsync($"https://api-v2launch.trakt.tv/sync/watchlist/remove", content).Result;
-				var body = response.Content.ReadAsStringAsync().Result;
-
-				Console.WriteLine(body);
-			});
-		}
-
-		public Task RateShow(Show show, int rating)
-		{
-			return new Task(() => {
-				var client = new HttpClient();
-				client.DefaultRequestHeaders.TryAddWithoutValidation("trakt-api-version", "2");
-				client.DefaultRequestHeaders.TryAddWithoutValidation("trakt-api-key", _traktClientID);
-				client.DefaultRequestHeaders.TryAddWithoutValidation("authorization", "Bearer {0}".Fmt(Settings.Instance.AuthToken));
-
-				var showRating = new RatedShow
-				{
-					Title = show.Title,
-					Year = show.Year.Value,
-					Identifiers = show.Identifiers,
-					Rating = rating,
-				};
-
-				var root = new RatedShowRoot();
-				root.Shows.Add(showRating);
-
-				var codeJson = JsonConvert.SerializeObject(root);
-				var content = new StringContent(codeJson, Encoding.UTF8, "application/json");
-				var response = client.PostAsync("https://api-v2launch.trakt.tv/sync/ratings", content).Result;
-				var body = response.Content.ReadAsStringAsync().Result;
-
-				Console.WriteLine(body);
-			});
-		}*/
 	}
 }

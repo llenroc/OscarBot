@@ -64,7 +64,13 @@ namespace Oscar.Bot
 			set { SetProperty(value); }
 		}
 
-		public bool ProvideSummary
+		public Show Show
+		{
+			get { return GetProperty<Show>(); }
+			set { SetProperty(value); }
+		}
+		
+		public bool ProvideAdditionalInfo
 		{
 			get { return GetProperty<bool>(); }
 			set { SetProperty(value); }

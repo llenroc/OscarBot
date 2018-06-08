@@ -25,58 +25,11 @@ namespace Oscar.Bot
 		{
 			dialogs = new DialogSet();
 			dialogs.Add("None", new WaterfallStep[] { DefaultDialog });
-			dialogs.Add("TV_NextEpisode", new WaterfallStep[] { ResolveInquiry, AskProvideSummary, ProvideSummary });
-			dialogs.Add("ProvideSummaryPrompt", new ChoicePrompt(Culture.English));
+			dialogs.Add("TV_NextEpisode", new WaterfallStep[] { ResolveInquiry, AskProvideAdditionalInfo, ProvideAdditionalInfo });
+			dialogs.Add("ProvideAdditionalInfoPrompt", new ChoicePrompt(Culture.English));
 		}
 
-		private async Task AllowRerunsValidator(ITurnContext context, Prompts.TextResult result)
-		{
-			if(string.IsNullOrWhiteSpace(result.Value)
-				|| (!result.Value.Equals("yes", StringComparison.CurrentCultureIgnoreCase) && !result.Value.Equals("no", StringComparison.CurrentCultureIgnoreCase))
-				&& (!result.Value.Equals("y", StringComparison.CurrentCultureIgnoreCase) && !result.Value.Equals("n", StringComparison.CurrentCultureIgnoreCase)))
-			{
-				result.Status = Prompts.PromptStatus.NotRecognized;
-				await context.SendActivity("Please reply with 'yes' or 'no'");
-			}
-		}
-		private Task DefaultDialog(DialogContext dialogContext, object args, SkipStepFunction next)
-		{
-			return dialogContext.Context.SendActivity("I'm sorry, I'm not quite sure what you mean.");
-		}
-
-		private async Task AskProvideSummary(DialogContext dialogContext, object args, SkipStepFunction next)
-		{
-			var inquiry = new EpisodeInquiry(dialogContext.ActiveDialog.State);
-
-			if(inquiry.Episode == null || inquiry.Episode.Overview == null)
-			{
-				await dialogContext.Continue();
-				return;
-			}
-
-			var yes = new Prompts.Choices.Choice { Value = "Yes" };
-			var no = new Prompts.Choices.Choice { Value = "No" };
-			await dialogContext.Prompt("ProvideSummaryPrompt", "Would you like me to provide a summary of this episode?", new ChoicePromptOptions() { Choices = new List<Prompts.Choices.Choice> { yes, no } });
-		}
-
-
-		private async Task ProvideSummary(DialogContext dialogContext, object args, SkipStepFunction next)
-		{
-			var inquiry = new EpisodeInquiry(dialogContext.ActiveDialog.State);
-
-			if(args is Prompts.ChoiceResult result)
-			{
-				inquiry.ProvideSummary = result.Value.Value == "Yes";
-			}
-
-			if(inquiry.ProvideSummary)
-			{
-				var response = $"Summary: {inquiry.Episode.Overview}";
-				await dialogContext.Context.SendActivity(response);
-			}
-
-			await dialogContext.End();
-		}
+		#region Resolve Inquiry
 
 		private async Task ResolveInquiry(DialogContext dialogContext, object args, SkipStepFunction next)
 		{
@@ -99,7 +52,7 @@ namespace Oscar.Bot
 
 			if(show == null)
 			{
-				var response = $"Umm, I wasn't able to find any shows titled '{inquiry.MediaTitle}'. Bai.";
+				var response = $"Hrmm, it doesn't look like there are any shows called '{inquiry.MediaTitle}'.";
 				//TODO: Possibly prompt them for an alternate title
 
 				await dialogContext.Context.SendActivity(response);
@@ -108,6 +61,7 @@ namespace Oscar.Bot
 			}
 
 			inquiry.Episode = episode;
+			inquiry.Show = show;
 			dialogContext.ActiveDialog.State = inquiry;
 
 			if(episode == null)
@@ -127,6 +81,70 @@ namespace Oscar.Bot
 				await dialogContext.Continue();
 			}
 		}
+
+		#endregion
+
+		#region Provide Additional Info
+
+		private async Task AskProvideAdditionalInfo(DialogContext dialogContext, object args, SkipStepFunction next)
+		{
+			var inquiry = new EpisodeInquiry(dialogContext.ActiveDialog.State);
+
+			if(inquiry.Episode == null)
+			{
+				await dialogContext.Continue();
+				return;
+			}
+
+			var item = inquiry.Episode.Overview == null ? "show" : "episode";
+			var yes = new Prompts.Choices.Choice { Value = "Yes" };
+			var no = new Prompts.Choices.Choice { Value = "No" };
+			await dialogContext.Prompt("ProvideAdditionalInfoPrompt", $"Would you like to see additional info about this {item}?", new ChoicePromptOptions() { Choices = new List<Prompts.Choices.Choice> { yes, no } });
+		}
+
+		private async Task ProvideAdditionalInfo(DialogContext dialogContext, object args, SkipStepFunction next)
+		{
+			var inquiry = new EpisodeInquiry(dialogContext.ActiveDialog.State);
+
+			if(args is Prompts.ChoiceResult result)
+			{
+				inquiry.ProvideAdditionalInfo = result.Value.Value == "Yes";
+			}
+
+			if(inquiry.ProvideAdditionalInfo)
+			{
+				if(inquiry.Episode.Overview != null)
+				{
+					var response = $"Summary: {inquiry.Episode.Overview}";
+					await dialogContext.Context.SendActivity(response);
+				}
+
+				var imageUrl = await TmdbService.Instance.GetShowImageUrlLandscape(inquiry.Show.Ids.Tmdb);
+				var activity = MessageFactory.Attachment(GetInternetAttachment(imageUrl, inquiry.Show.Title));
+				await dialogContext.Context.SendActivity(activity);
+			}
+
+			await dialogContext.End();
+		}
+
+		/*async Task AllowRerunsValidator(ITurnContext context, Prompts.TextResult result)
+		{
+			if(string.IsNullOrWhiteSpace(result.Value)
+				|| (!result.Value.Equals("yes", StringComparison.CurrentCultureIgnoreCase) && !result.Value.Equals("no", StringComparison.CurrentCultureIgnoreCase))
+				&& (!result.Value.Equals("y", StringComparison.CurrentCultureIgnoreCase) && !result.Value.Equals("n", StringComparison.CurrentCultureIgnoreCase)))
+			{
+				result.Status = Prompts.PromptStatus.NotRecognized;
+				await context.SendActivity("Please reply with 'yes' or 'no'");
+			}
+		}
+		private Task DefaultDialog(DialogContext dialogContext, object args, SkipStepFunction next)
+		{
+			return dialogContext.Context.SendActivity("I'm sorry, I'm not quite sure what you mean.");
+		}*/
+
+		#endregion
+
+		#region Turn / Utilities
 
 		public async Task OnTurn(ITurnContext context)
 		{
@@ -173,7 +191,12 @@ namespace Oscar.Bot
 			}
 		}
 
-		private T GetEntity<T>(RecognizerResult luisResult, string entityKey)
+		private Task DefaultDialog(DialogContext dialogContext, object args, SkipStepFunction next)
+		{
+			return dialogContext.Context.SendActivity("I'm sorry, I'm not quite sure what you mean.");
+		}
+
+		T GetEntity<T>(RecognizerResult luisResult, string entityKey)
 		{
 			var data = luisResult.Entities as IDictionary<string, JToken>;
 			if(data.TryGetValue(entityKey, out JToken value))
@@ -182,5 +205,18 @@ namespace Oscar.Bot
 			}
 			return default(T);
 		}
+
+		Attachment GetInternetAttachment(string imageUrl, string name)
+		{
+			var ext = System.IO.Path.GetExtension(imageUrl);
+			return new Attachment
+			{
+				Name = $"{name}.{ext}",
+				ContentType = $"image/{ext}",
+				ContentUrl = imageUrl
+			};
+		}
+
+		#endregion
 	}
 }
