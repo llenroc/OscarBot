@@ -9,6 +9,8 @@ using Microsoft.Bot.Builder.Integration.AspNet.Core;
 using Microsoft.Bot.Builder.TraceExtensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Bot.Builder.Azure;
+using Microsoft.Bot.Builder.Ai.Translation;
 
 namespace Oscar.Bot
 {
@@ -36,6 +38,9 @@ namespace Oscar.Bot
             {
                 options.CredentialProvider = new ConfigurationCredentialProvider(Configuration);
 
+				//var connectionString = Configuration.GetSection("TableStorageConnectionString")?.Value;
+				//options.Middleware.Add(new ConversationState<EpisodeInquiry>(new AzureTableStorage(connectionString, "conversations")));
+
                 // The CatchExceptionMiddleware provides a top-level exception handler for your bot. 
                 // Any exceptions thrown by other Middleware, or by your OnTurn method, will be 
                 // caught here. To facillitate debugging, the exception is sent out, via Trace, 
@@ -43,13 +48,12 @@ namespace Oscar.Bot
                 // an "Ooops" message is sent. 
                 options.Middleware.Add(new CatchExceptionMiddleware<Exception>(async (context, exception) =>
                 {
-                    await context.TraceActivity("EchoBot Exception", exception);
+                    await context.TraceActivity("OscarBot Exception", exception);
                     await context.SendActivity("Sorry, it looks like something went wrong!");
                 }));
 
-                // The Memory Storage used here is for local bot debugging only. When the bot
-                // is restarted, anything stored in memory will be gone. 
-                IStorage dataStore = new MemoryStorage();
+				// The Memory Storage used here is for local bot debugging only. When the bot
+				// is restarted, anything stored in memory will be gone. 
 
 				// The File data store, shown here, is suitable for bots that run on 
 				// a single machine and need durable state across application restarts.                 
@@ -64,8 +68,14 @@ namespace Oscar.Bot
 				// IStorage dataStore = new Microsoft.Bot.Builder.Azure.AzureTableStorage("AzureTablesConnectionString", "TableName");
 				// IStorage dataStore = new Microsoft.Bot.Builder.Azure.AzureBlobStorage("AzureBlobConnectionString", "containerName");
 
+				var cs = Configuration.GetSection("TableStorageConnectionString")?.Value;
+				IStorage dataStore = new AzureBlobStorage(cs, "conversations");
+
 				options.Middleware.Add(new ConversationState<Dictionary<string, object>>(dataStore));
 				options.Middleware.Add(new UserState<UserState>(dataStore));
+
+				var translationApiKey = Configuration.GetSection("TranslationApiKey")?.Value;
+				options.Middleware.Add(new TranslationMiddleware(new string[] { "en" }, translationApiKey, true));
 
 				var (modelId, subscriptionKey, url) = GetLuisConfiguration(Configuration);
 				var model = new LuisModel(modelId, subscriptionKey, url);

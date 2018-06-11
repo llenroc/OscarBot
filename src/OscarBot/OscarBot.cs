@@ -16,7 +16,7 @@ namespace Oscar.Bot
 {
 	public class OscarBot : IBot
 	{
-		readonly string _greetingMessage = "Hi! My name is Oscar. I can tell you when the next episode of a TV show will air. Well hay.";
+		readonly string _greetingMessage = "Hi! My name is Oscar. I can tell you when the next episode of a TV show will air or who plays a character in a show.";
 		private const double LUIS_INTENT_THRESHOLD = 0.2d;
 
 		private readonly DialogSet dialogs;
@@ -25,13 +25,15 @@ namespace Oscar.Bot
 		{
 			dialogs = new DialogSet();
 			dialogs.Add("None", new WaterfallStep[] { DefaultDialog });
-			dialogs.Add("TV_NextEpisode", new WaterfallStep[] { ResolveInquiry, AskProvideAdditionalInfo, ProvideAdditionalInfo });
+			dialogs.Add("Greeting", new WaterfallStep[] { GreetingDialog });
+			dialogs.Add("TV_NextEpisode", new WaterfallStep[] { ResolveEpisodeInquiry, AskProvideAdditionalInfo, ProvideAdditionalEpisodeInfo });
+			dialogs.Add("TV_CastInfo", new WaterfallStep[] { ResolveCastInfoInquiry });
 			dialogs.Add("ProvideAdditionalInfoPrompt", new ChoicePrompt(Culture.English));
 		}
 
-		#region Resolve Inquiry
+		#region Resolve Episode Inquiry
 
-		private async Task ResolveInquiry(DialogContext dialogContext, object args, SkipStepFunction next)
+		private async Task ResolveEpisodeInquiry(DialogContext dialogContext, object args, SkipStepFunction next)
 		{
 			var inquiry = new EpisodeInquiry(dialogContext.ActiveDialog.State);
 
@@ -102,7 +104,7 @@ namespace Oscar.Bot
 			await dialogContext.Prompt("ProvideAdditionalInfoPrompt", $"Would you like to see additional info about this {item}?", new ChoicePromptOptions() { Choices = new List<Prompts.Choices.Choice> { yes, no } });
 		}
 
-		private async Task ProvideAdditionalInfo(DialogContext dialogContext, object args, SkipStepFunction next)
+		private async Task ProvideAdditionalEpisodeInfo(DialogContext dialogContext, object args, SkipStepFunction next)
 		{
 			var inquiry = new EpisodeInquiry(dialogContext.ActiveDialog.State);
 
@@ -141,6 +143,64 @@ namespace Oscar.Bot
 		{
 			return dialogContext.Context.SendActivity("I'm sorry, I'm not quite sure what you mean.");
 		}*/
+
+		#endregion
+
+		#region Resolve Cast Info Inquiry
+
+		private async Task ResolveCastInfoInquiry(DialogContext dialogContext, object args, SkipStepFunction next)
+		{
+			var inquiry = new CastInfoInquiry(dialogContext.ActiveDialog.State);
+
+			if(args is IDictionary<string, object> hash)
+			{
+				if(hash["LuisResult"] is RecognizerResult luisResult)
+				{
+					var title = GetEntity<string>(luisResult, "Media_Title");
+					if(!string.IsNullOrEmpty(title))
+						inquiry.MediaTitle = title;
+
+					var characterName = GetEntity<string>(luisResult, "Media_CharacterName");
+					if(!string.IsNullOrEmpty(characterName))
+						inquiry.CharacterName = characterName;
+
+					dialogContext.ActiveDialog.State = inquiry;
+				}
+			}
+
+			var (show, episode) = await TraktService.Instance.GetNextEpisode(inquiry.MediaTitle);
+
+			if(show == null)
+			{
+				var response = $"Hrmm, it doesn't look like there are any shows called '{inquiry.MediaTitle}'.";
+				//TODO: Possibly prompt them for an alternate title
+
+				await dialogContext.Context.SendActivity(response);
+				await dialogContext.End();
+				return;
+			}
+
+			//inquiry.Episode = episode;
+			//inquiry.Show = show;
+			dialogContext.ActiveDialog.State = inquiry;
+
+			if(episode == null)
+			{
+				var response = $"It doesn't look like {show.Title} has any upcoming episodes.";
+				await dialogContext.Context.SendActivity(response);
+				await dialogContext.End();
+			}
+			else
+			{
+				var response = $"The next episode of {show.Title} will air on {episode.FirstAired.LocalDateTime.ToString("dddd, MMMM d 'at' h:mm tt")} on {show.Network}.";
+				await dialogContext.Context.SendActivity(response);
+
+				var userContext = dialogContext.Context.GetUserState<UserState>();
+				//userContext.EpisodeInquiries.Add(inquiry);
+
+				await dialogContext.Continue();
+			}
+		}
 
 		#endregion
 
@@ -194,6 +254,11 @@ namespace Oscar.Bot
 		private Task DefaultDialog(DialogContext dialogContext, object args, SkipStepFunction next)
 		{
 			return dialogContext.Context.SendActivity("I'm sorry, I'm not quite sure what you mean.");
+		}
+
+		private Task GreetingDialog(DialogContext dialogContext, object args, SkipStepFunction next)
+		{
+			return dialogContext.Context.SendActivity("Howdy");
 		}
 
 		T GetEntity<T>(RecognizerResult luisResult, string entityKey)

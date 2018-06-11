@@ -16,7 +16,7 @@ namespace Oscar.Bot
 		public string Title { get; set; }
 
 		[JsonProperty("ids")]
-		public Dictionary<string, long?> Ids { get; set; }
+		public Ids Ids { get; set; }
 
 		[JsonProperty("number_abs")]
 		public object NumberAbs { get; set; }
@@ -39,8 +39,8 @@ namespace Oscar.Bot
 		[JsonProperty("updated_at")]
 		public DateTimeOffset UpdatedAt { get; set; }
 
-		[JsonProperty("available_translations")]
-		public List<string> AvailableTranslations { get; set; }
+		//[JsonProperty("available_translations")]
+		//public List<string> AvailableTranslations { get; set; }
 
 		[JsonProperty("runtime")]
 		public long Runtime { get; set; }

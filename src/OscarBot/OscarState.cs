@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Newtonsoft.Json;
 
 namespace Oscar.Bot
 {
@@ -58,12 +59,14 @@ namespace Oscar.Bot
 			set { SetProperty(value); }
 		}
 
+	//	[JsonIgnore]
 		public Episode Episode
 		{
 			get { return GetProperty<Episode>(); }
 			set { SetProperty(value); }
 		}
 
+		//[JsonIgnore]
 		public Show Show
 		{
 			get { return GetProperty<Show>(); }
@@ -75,6 +78,36 @@ namespace Oscar.Bot
 			get { return GetProperty<bool>(); }
 			set { SetProperty(value); }
 		}
+	}
 
+	public class CastInfoInquiry : BaseState
+	{
+		public CastInfoInquiry() : base(null) { }
+
+		public CastInfoInquiry(IDictionary<string, object> source = null) : base(source) { }
+
+		public string MediaTitle
+		{
+			get { return GetProperty<string>(); }
+			set { SetProperty(value); }
+		}
+
+		public string CharacterName
+		{
+			get { return GetProperty<string>(); }
+			set { SetProperty(value); }
+		}
+
+		public Show Show
+		{
+			get { return GetProperty<Show>(); }
+			set { SetProperty(value); }
+		}
+
+		public bool ProvideAdditionalInfo
+		{
+			get { return GetProperty<bool>(); }
+			set { SetProperty(value); }
+		}
 	}
 }

@@ -59,11 +59,11 @@ namespace Oscar.Bot
 		[JsonProperty("language")]
 		public string Language { get; set; }
 
-		[JsonProperty("available_translations")]
-		public List<string> AvailableTranslations { get; set; }
+		//[JsonProperty("available_translations")]
+		//public List<string> AvailableTranslations { get; set; }
 
-		[JsonProperty("genres")]
-		public List<string> Genres { get; set; }
+		//[JsonProperty("genres")]
+		//public List<string> Genres { get; set; }
 
 		[JsonProperty("aired_episodes")]
 		public long AiredEpisodes { get; set; }
